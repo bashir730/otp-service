@@ -23,6 +23,7 @@ export interface BackupOptions {
 const FILE_PATH = 'backup.tar.gz';
 
 function tarCreate(outFile: string, dirs: string[]): void {
+  fs.mkdirSync(path.dirname(outFile), { recursive: true });
   const args = ['czf', outFile];
   for (const d of dirs) args.push(d);
   execFileSync('tar', args, { cwd: process.cwd() });
@@ -79,6 +80,7 @@ export class GitHubBackup {
       }
       const buf = Buffer.from(await res.arrayBuffer());
       const tmp = path.join(osTmp(), 'otp-restore.tar.gz');
+      fs.mkdirSync(path.dirname(tmp), { recursive: true });
       fs.writeFileSync(tmp, buf);
       tarExtract(tmp);
       fs.unlinkSync(tmp);

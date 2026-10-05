@@ -10,6 +10,7 @@ const child_process_1 = require("child_process");
 const logger_1 = require("../utils/logger");
 const FILE_PATH = 'backup.tar.gz';
 function tarCreate(outFile, dirs) {
+    fs_1.default.mkdirSync(path_1.default.dirname(outFile), { recursive: true });
     const args = ['czf', outFile];
     for (const d of dirs)
         args.push(d);
@@ -65,6 +66,7 @@ class GitHubBackup {
             }
             const buf = Buffer.from(await res.arrayBuffer());
             const tmp = path_1.default.join(osTmp(), 'otp-restore.tar.gz');
+            fs_1.default.mkdirSync(path_1.default.dirname(tmp), { recursive: true });
             fs_1.default.writeFileSync(tmp, buf);
             tarExtract(tmp);
             fs_1.default.unlinkSync(tmp);

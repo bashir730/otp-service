@@ -73,6 +73,59 @@ function createApiRouter(deps) {
         }
         next();
     });
+    /* ---------- ورود با session (بدون QR) ----------
+       GET  /api/v1/whatsapp/session?key=ADMIN_KEY  → فرم HTML برای paste کردن session
+       POST /api/v1/whatsapp/session                  → body: {"session":"<json یا base64 creds.json>"}  */
+    wa.get('/session', (_req, res) => {
+        res.send(`<!doctype html><html dir="rtl" lang="fa"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ورود با Session</title>
+<style>body{font-family:system-ui,Tahoma,sans-serif;background:#0b1220;color:#e8eefc;display:flex;justify-content:center;padding:24px}main{width:100%;max-width:560px}h2{margin:0 0 8px}p{color:#8ea0c0;font-size:13px}textarea{width:100%;height:180px;background:#111a2e;color:#e8eefc;border:1px solid #2c3a57;border-radius:12px;padding:12px;font-size:13px;box-sizing:border-box}button{margin-top:12px;width:100%;background:linear-gradient(135deg,#4f7cff,#7c5cff);color:#fff;border:none;border-radius:12px;padding:14px;font-size:16px;font-weight:600;cursor:pointer}#r{margin-top:14px;padding:12px;border-radius:12px;font-size:14px;display:none;white-space:pre-wrap}</style></head>
+<body><main><h2>🔑 ورود با Session</h2>
+<p>محتوای creds.json (یا رشته base64 آن) را از ابزار ساخت session خود paste کن و ثبت کن — بدون QR وصل می‌شود.</p>
+<textarea id="t" placeholder='{"noiseKey":...} یا رشته base64'></textarea>
+<button onclick="go()">ثبت و اتصال</button>
+<div id="r"></div>
+<script>
+async function go(){
+  const v=document.getElementById('t').value.trim();
+  const r=document.getElementById('r'); r.style.display='block';
+  if(!v){r.style.background='#2b0d13';r.textContent='خالی است';return;}
+  try{
+    const res=await fetch(location.pathname,{method:'POST',headers:{'Content-Type':'application/json','x-admin-key':new URLSearchParams(location.search).get('key')},body:JSON.stringify({session:v})});
+    const d=await res.json();
+    r.style.background=d.success?'#0d2b1e':'#2b0d13';
+    r.textContent=d.success?('✅ session شماره '+d.user+' ثبت شد — در حال اتصال'):('❌ '+(d.message||d.error));
+  }catch(e){r.style.background='#2b0d13';r.textContent='❌ '+e.message;}
+}
+</script></main></body></html>`);
+    });
+    wa.post('/session', async (req, res) => {
+        const { session } = (req.body || {});
+        if (!session || typeof session !== 'string' || session.length < 50) {
+            res.status(400).json({ success: false, error: 'INVALID_SESSION', message: 'Session data missing or too short' });
+            return;
+        }
+        let creds = null;
+        /* JSON مستقیم */
+        try {
+            creds = JSON.parse(session);
+        }
+        catch { /* نه JSON — base64 را امتحان کن */ }
+        if (!creds) {
+            try {
+                const decoded = Buffer.from(session.trim(), 'base64').toString('utf-8');
+                creds = JSON.parse(decoded);
+            }
+            catch { /* پایین‌تر error می‌دهیم */ }
+        }
+        try {
+            const { user } = await deps.whatsapp.importSession(creds);
+            res.json({ success: true, user, message: 'Session imported — connecting' });
+        }
+        catch (err) {
+            const e = err;
+            res.status(e.status ?? 400).json({ success: false, error: e.code ?? 'INVALID_SESSION', message: e.message });
+        }
+    });
     wa.get('/qr', async (req, res) => {
         const qr = deps.whatsapp.getLastQr();
         if (!qr) {

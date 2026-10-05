@@ -60,6 +60,19 @@ class WhatsAppService {
     isConnected() {
         return this.state === 'connected' && this.sock !== null;
     }
+    /* ورود با session: creds.json آماده را می‌پذیرد و بدون QR وصل می‌شود */
+    async importSession(creds) {
+        const c = creds;
+        if (!c || typeof c !== 'object' || !c.me?.id || !c.noiseKey) {
+            throw new errors_1.AppError('INVALID_SESSION', 400, 'Session data is invalid — expected a Baileys creds.json (JSON or base64)');
+        }
+        fs_1.default.mkdirSync(this.sessionDir, { recursive: true });
+        await this.end();
+        fs_1.default.writeFileSync(path_1.default.join(this.sessionDir, 'creds.json'), JSON.stringify(c, null, 2));
+        logger_2.logger.info({ user: String(c.me.id).split('@')[0] }, 'Session imported — connecting without QR');
+        void this.connect();
+        return { user: String(c.me.id).split('@')[0] };
+    }
     /* callback بعد از اتصال موفق (پشتیبان‌گیری session) */
     onConnected(cb) {
         this.connectedCb = cb;
